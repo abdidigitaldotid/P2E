@@ -1,39 +1,43 @@
 // app/page.tsx
 import { redirect } from 'next/navigation';
-import { createClient } from '@/utils/supabase/server';
+import { cookies } from 'next/headers'; // Import cookies
+import { createClient } from '@/utils/supabase/server'; 
 import LogoutButton from '@/app/components/LogoutButton';
-import ClaimRewardButton from './components/ClaimRewardButton'; // Komponen baru
-import { revalidatePath } from 'next/cache'; // Untuk refresh data
+import ClaimRewardButton from './components/ClaimRewardButton';
+import { revalidatePath } from 'next/cache';
 
 export default async function Home() {
-  const supabase = createClient();
+  const cookieStore = cookies(); // Panggil cookies() di sini
+  const supabase = createClient(cookieStore); // Berikan ke createClient
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     redirect('/auth');
   }
 
-  // Ambil data profil dari tabel 'profiles'
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('user_id', user.id)
-    .single(); // .single() untuk mengambil satu baris saja
+    .single();
 
-  // Fungsi untuk klaim hadiah (Server Action)
   const claimReward = async () => {
     'use server';
 
-    if (!profile) return; // Pastikan profil ada
+    if (!profile) return;
 
-    const newBalance = (profile.balance ?? 0) + 10; // Tambah 10 koin
+    const newBalance = (profile.balance ?? 0) + 10;
+
+    // Kita perlu memanggil ulang cookieStore dan supabase di dalam Server Action
+    const cookieStore = cookies();
+    const supabase = createClient(cookieStore);
 
     await supabase
       .from('profiles')
       .update({ balance: newBalance })
       .eq('user_id', user.id);
 
-    revalidatePath('/'); // Beritahu Next.js untuk memuat ulang data di halaman ini
+    revalidatePath('/');
   };
 
   return (
@@ -53,7 +57,6 @@ export default async function Home() {
         </div>
 
         <div className="mt-8">
-            {/* Form yang memanggil Server Action */}
             <form action={claimReward}>
                 <ClaimRewardButton />
             </form>
